@@ -5,11 +5,14 @@ from pipe import Pipe
 pg.init()
 
 class game:
+        
     def __init__(self):
-        self.width=600
+        #setting window config
+        self.width = 600
         self.height=768
-        self.scale_factor=1.5
-        self.birdscale_factor=0.1
+        self.scale_factor=0.5
+        self.birdscale_factor=0.07
+        self.ground_factor=3
         self.win=pg.display.set_mode((self.width,self.height))
         self.clock=pg.time.Clock()
         self.move_speed=250
@@ -17,6 +20,7 @@ class game:
         self.is_enter_pressed=False
         self.pipes=[]
         self.pipe_generate_counter=71
+        self.gameover=False
         self.setupbackground()
          
         self.gameLoop()
@@ -26,27 +30,45 @@ class game:
     def gameLoop(self):
         last_time=time.time()
         while True:
+            #calculating delta time
             new_time=time.time()
             dt=new_time-last_time
             last_time=new_time
 
             for event in pg.event.get():
-                if event.type==pg.QUIT:
-                    pg.quit()     
+                if event.type == pg.QUIT:
+                    pg.quit()
                     sys.exit()
                 if event.type==pg.KEYDOWN:
                     if event.key==pg.K_RETURN:
                         self.is_enter_pressed=True
-                    if event.key==pg.K_SPACE and self.is_enter_pressed :
+                        self.bird.update_on=True
+                    if event.key==pg.K_SPACE and self.is_enter_pressed:
                         self.bird.flap(dt)
 
             self.updateEverything(dt)
-            self.drowimages()
+            self.checkCollisions()
+            self.drawImages()
             pg.display.update()
             self.clock.tick(60)
+    
+    def checkCollisions(self):
+        if len(self.pipes):
+            if self.bird.rect.bottom>=568:
+                self.bird.update_on=False
+                self.is_enter_pressed=False
+                self.gameover=True
+            if (self.bird.rect.colliderect(self.pipes[0].rect_down) or
+            self.bird.rect.colliderect(self.pipes[0].rect_up)):
+                self.is_enter_pressed=False
+                self.gameover=True
+
+
+
 
     def updateEverything(self,dt):
         if self.is_enter_pressed:
+            # moving the ground
 
             self.ground1_rect.x-=int(self.move_speed*dt)
             self.ground2_rect.x-=int(self.move_speed*dt)
@@ -56,27 +78,42 @@ class game:
             if self.ground2_rect.right<0:
                 self.ground2_rect.x=self.ground1_rect.right
 
+            #generating pipes
             if self.pipe_generate_counter>70:
                 self.pipes.append(Pipe(self.scale_factor,self.move_speed))
                 self.pipe_generate_counter=0
             self.pipe_generate_counter+=1
 
-            for pipe in self,pipes:
+            #moving the pipes
+            for pipe in self.pipes:
                 pipe.update(dt)
+            #removing pipes out if out of screen
+            if len(self.pipes)!=0:
+                if self.pipes[0].rect_up.right<0:
+                    self.pipes.pop(0)
+                    #moving the bird
             self.bird.update(dt)
 
-    def drowimages(self):
+    def drawImages(self):
         self.win.blit(self.bg_img,(0,-300))
-        for pipe in self.pipes :
-            pipe.drawpipe(self.win)
+        for pipe in self.pipes:
+            pipe.drawPipe(self.win)
         self.win.blit(self.ground1_img,self.ground1_rect)
         self.win.blit(self.ground2_img,self.ground2_rect)
         self.win.blit(self.bird.image,self.bird.rect)
+
+        if self.gameover:
+            font=pg.font.Font(None,74)
+            gameovertext=font.render("game over",True,(255,0,0))
+            text_rect=gameovertext.get_rect(center=(self.width/2,self.height/2))
+            self.win.blit(gameovertext,text_rect)
+
         
     def setupbackground(self):
-        self.bg_img=pg.transform.scale(pg.image.load("gallery/background1.png").convert(),(600,1066))
-        self.ground1_img=pg.transform.scale_by(pg.image.load("gallery/base.png").convert(),self.scale_factor)
-        self.ground2_img=pg.transform.scale_by(pg.image.load("gallery/base.png").convert(),self.scale_factor)
+        #loading image of background and ground
+        self.bg_img=pg.transform.scale(pg.image.load("gallery/background.png").convert(),(600,1066))
+        self.ground1_img=pg.transform.scale_by(pg.image.load("gallery/base.png").convert(),self.ground_factor)
+        self.ground2_img=pg.transform.scale_by(pg.image.load("gallery/base.png").convert(),self.ground_factor)
 
         self.ground1_rect=self.ground1_img.get_rect()
         self.ground2_rect=self.ground2_img.get_rect()
